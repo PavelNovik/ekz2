@@ -1,88 +1,143 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { ThunkAction, ThunkDispatch } from "redux-thunk";
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 
 // Types
-type PostType = {
-    id: string;
-    body: string;
-    title: string;
-    userId: string;
+type NullableType<T> = null | T;
+
+type LoginFieldsType = {
+    email: string;
+    password: string;
 };
 
-// Api
+// API
 const instance = axios.create({ baseURL: "https://exams-frontend.kimitsu.it-incubator.ru/api/" });
 
-const postsAPI = {
-    getPosts() {
-        return instance.get<PostType[]>("posts");
+const api = {
+    login(data: LoginFieldsType) {
+        return instance.post("auth/login", data);
     },
 };
 
 // Reducer
-const initState = [] as PostType[];
+const initState = {
+    isLoading: false,
+    error: null as NullableType<string>,
+    isLoggedIn: false,
+};
 
 type InitStateType = typeof initState;
 
-const postsReducer = (
-    state: InitStateType = initState,
-    action: GetPostsActionType,
-): InitStateType => {
+const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
     switch (action.type) {
-        case "POSTS/GET-POSTS":
-            return action.posts;
+        case "APP/SET-IS-LOGGED-IN":
+            return { ...state, isLoggedIn: action.isLoggedIn };
+        case "APP/IS-LOADING":
+            return { ...state, isLoading: action.isLoading };
+        case "APP/SET-ERROR":
+            return { ...state, error: action.error };
+        default:
+            return state;
     }
-    return state;
 };
 
-const getPostsAC = (posts: PostType[]) => ({ type: "POSTS/GET-POSTS", posts }) as const;
-type GetPostsActionType = ReturnType<typeof getPostsAC>;
+// Actions
+const setIsLoggedIn = (isLoggedIn: boolean) =>
+    ({ type: "APP/SET-IS-LOGGED-IN", isLoggedIn }) as const;
+const setLoadingAC = (isLoading: boolean) => ({ type: "APP/IS-LOADING", isLoading }) as const;
+const setError = (error: string | null) => ({ type: "APP/SET-ERROR", error }) as const;
+type ActionsType =
+    | ReturnType<typeof setIsLoggedIn>
+    | ReturnType<typeof setLoadingAC>
+    | ReturnType<typeof setError>;
 
-const getPostsTC = (): AppThunk => (dispatch) => {
-    postsAPI.getPosts().then((res) => {
-        dispatch(getPostsAC(res.data));
-    });
-};
+// Thunk
+const loginTC =
+    (values: LoginFieldsType): AppThunk =>
+        (dispatch) => {
+            dispatch(setLoadingAC(true));
+            api
+                .login(values)
+                .then((res) => {
+                    dispatch(setIsLoggedIn(true));
+                    alert("Вы залогинились успешно");
+                })
+                .catch((e) => {
+                    dispatch(setError(e.response.data.errors))
+                })
+                .finally(() => {
+                    dispatch(setLoadingAC(false));
+                });
+        };
 
 // Store
 const rootReducer = combineReducers({
-    posts: postsReducer,
+    app: appReducer,
 });
 
 const store = configureStore({ reducer: rootReducer });
 type RootState = ReturnType<typeof store.getState>;
-type AppDispatch = ThunkDispatch<RootState, unknown, GetPostsActionType>;
-type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, GetPostsActionType>;
+type AppDispatch = ThunkDispatch<RootState, unknown, ActionsType>;
+type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, ActionsType>;
 const useAppDispatch = () => useDispatch<AppDispatch>();
 const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
-// App
-const App = () => {
-    const dispatch = useAppDispatch();
-    const posts = useAppSelector((state) => state.posts);
+// Loader
+export const Loader = () => {
+    return <h1>Loading ...</h1>;
+};
 
-    useEffect(() => {
-        dispatch(getPostsTC());
-    }, []);
+// App
+export const App = () => {
+    const dispatch = useAppDispatch();
+
+    const [form, setForm] = useState<LoginFieldsType>({ email: "", password: "" });
+
+    const error = useAppSelector((state) => state.app.error);
+    const isLoading = useAppSelector((state) => state.app.isLoading);
+
+    const changeFormValuesHandler = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+        if (field === "email") {
+            setForm({ ...form, email: e.currentTarget.value });
+        }
+        if (field === "password") {
+            setForm({ ...form, password: e.currentTarget.value });
+        }
+    };
+
+    const submitForm = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        dispatch(loginTC(form));
+    };
 
     return (
-        <>
-            <h1>📜 Список постов</h1>
-            {posts.length ? (
-                posts.map((p) => {
-                    return (
-                        <div key={p.id}>
-                            <b>title</b>: {p.title}
-                        </div>
-                    );
-                })
-            ) : (
-                <h2>Постов нету 😥</h2>
-            )}
-        </>
+        <div>
+            {!!error && <h2 style={{ color: "red" }}>{error}</h2>}
+            {isLoading && <Loader />}
+            <form>
+                <div>
+                    <input
+                        placeholder={"Введите email"}
+                        value={form.email}
+                        onChange={(e) => changeFormValuesHandler(e, "email")}
+                    />
+                </div>
+                <div>
+                    <input
+                        type={"password"}
+                        placeholder={"Введите пароль"}
+                        value={form.password}
+                        onChange={(e) => changeFormValuesHandler(e, "password")}
+                    />
+                </div>
+                <button type="submit" onClick={submitForm}>
+                    Залогиниться
+                </button>
+            </form>
+        </div>
     );
 };
 
@@ -94,11 +149,11 @@ root.render(
 );
 
 // 📜 Описание:
-// При загрузке приложения вы должны увидеть список постов,
-// но из-за невнимательности была допущена ошибка.
+// Перед вами форма логинизации. Введите любые логин и пароль и попробуйте залогиниться.
+// У вас это навряд ли получится 😈, т.к. вы не знаете email и пароль.
+// Откройте Network и проанализируйте запрос.
+// Задача: вывести сообщение об ошибке, которую возвращает сервера говорящую о том что email или password некорректны.
 
-// Найдите и исправьте ошибку
-// Исправленную версию строки напишите в качестве ответа.
-// 🖥 Пример ответа: type InitStateType = typeof initState
-
-// P.S. Эта ошибка из реальной жизни, студенты так часто ошибаются и не могут понять в чем дело.
+// В качестве ответа указать строку коду, которая позволит это осуществить.
+// 🖥 Пример ответа: dispatch('Error message')
+// ❗ Типизировать ошибку не надо, т.к. там есть много нюансов, о которых вы узнаете позже
