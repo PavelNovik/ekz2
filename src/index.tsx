@@ -91,6 +91,7 @@ const getTodosTC = (): AppThunk => (dispatch) => {
         })
         .catch((e: AxiosError) => {
             // ❗❗❗ XXX ❗❗❗
+            baseErrorHandler(dispatch, e.message)
         });
 };
 
@@ -104,6 +105,7 @@ const getUsersTC = (): AppThunk => (dispatch) => {
         })
         .catch((e: AxiosError) => {
             // ❗❗❗ XXX ❗❗❗
+            baseErrorHandler(dispatch, e.message)
         });
 };
 
