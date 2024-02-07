@@ -1,67 +1,111 @@
-import axios from 'axios'
-import React, {useEffect, useState} from 'react'
-import ReactDOM from 'react-dom/client'
-import {createSearchParams} from "react-router-dom";
+import ReactDOM from "react-dom/client";
+import { ThunkAction, ThunkDispatch } from "redux-thunk";
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+import React, { useState } from "react";
+import { configureStore, combineReducers } from "@reduxjs/toolkit";
 
-type UserType = {
-    id: string;
-    name: string;
-    age: number;
-}
+// Styles
+const modal: React.CSSProperties = {
+    position: "fixed",
+    zIndex: 1,
+    left: 0,
+    top: 0,
+    width: "100%",
+    height: "100%",
+    overflow: "auto",
+    backgroundColor: "rgba(23,26,38,0.26)",
+};
 
-// API
-const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
+const modalContent: React.CSSProperties = {
+    backgroundColor: "#fefefe",
+    margin: "15% auto",
+    padding: "20px",
+    border: "1px solid #888",
+    width: "80%",
+};
 
-const api = {
-    getUsers() {
-        const par =createSearchParams({
-            pageSize: '3',
-            pageNumber: '2'
-        }).toString()
-        console.log(par)
+// Reducer
+const initState = { goodThings: [] as any[] };
+type InitStateType = typeof initState;
 
-        return instance.get(`users?${par}`)
-    },
-}
+const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
+    switch (action.type) {
+        case "LIKE":
+            return {
+                ...state,
+                goodThings: [action.thing, ...state.goodThings],
+            };
+    }
+    return state;
+};
 
-// App
-export const App = () => {
+// Store
+const rootReducer = combineReducers({ app: appReducer });
 
-    const [users, setUsers] = useState<UserType[]>([])
+const store = configureStore({ reducer: rootReducer });
+type RootState = ReturnType<typeof store.getState>;
+type AppDispatch = ThunkDispatch<RootState, unknown, ActionsType>;
+type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, ActionsType>;
+const useAppDispatch = () => useDispatch<AppDispatch>();
+const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
-    useEffect(() => {
-        api.getUsers()
-            .then((res) => {
-                setUsers(res.data.items)
-            })
-    }, [])
+const addThing = (thing: any) => ({ type: "LIKE", thing }) as const;
+type ActionsType = ReturnType<typeof addThing>;
 
+const Modal = (props: any) => {
+    return (
+        <div style={modalContent}>
+            modal:
+            <input value={props.value} onChange={(e) => props.setValue(e.target.value)} />
+            <button onClick={props.add}>add</button>
+        </div>
+    );
+};
+
+// Components
+export const Animals = () => {
+    const goodThings = useAppSelector((state) => state.app.goodThings);
+    const dispatch = useAppDispatch();
+
+    const [value, setValue] = useState("");
+    const [show, setShow] = useState(false);
+
+    const mapped = goodThings.map((t: any, i: number) => <div key={i}>{t}</div>);
 
     return (
-        <>
-            <h1>👪 Список пользователей</h1>
-            {
-                users.map(u => {
-                    return <div style={{display: 'flex', gap: '10px'}} key={u.id}>
-                        <p><b>name</b>: {u.name}</p>
-                        <p><b>age</b>: {u.age}</p>
-                    </div>
-                })
-            }
-        </>
-    )
-}
+        <div style={modal}>
+            <button onClick={() => setShow(true)}>show modal</button>
 
+            {show && (
+                <Modal
+                    value={value}
+                    setValue={setValue}
+                    add={() => {
+                        dispatch(addThing(value));
+                        setValue("");
+                        setShow(false)
+                    }}
+                />
+            )}
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<App/>)
+            {mapped}
+        </div>
+    );
+};
+
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+root.render(
+    <Provider store={store}>
+        <Animals />
+    </Provider>,
+);
 
 // 📜 Описание:
-// На странице отображен список юзеров из 3-человек.
-// Подгрузились именно эти пользователи не случайно, а из-за query параметров указанных в запросе.
-// Ваша задача переписать строку с запросом таким образом, чтобы получить аналогичный результат (все тех же юзеров),
-// при этом запрещено в ответе использовать символы вопроса и амперсанда.
-// В качестве ответа укажите полностью исправленную строку коду (переносы разрешены)
+// Откройте модалку, введите любой текст и нажмите add.
+// Введенный текст отобразится снизу, но модалка останется по прежнему видимой.
 
+// 🪛 Задача:
+// Необходимо сделать так, чтобы модалка пряталась сразу после добавления элемента
+// В качестве ответа укажите строку коду, которую необходимо добавить для реализации данной задачи
 
-// 🖥 Пример ответа: return instance.get('users=pageSize=3=pageNumber=2')
+// 🖥 Пример ответа: closeModal(true)
