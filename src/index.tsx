@@ -1,60 +1,143 @@
-import { useFormik } from 'formik';
-import React from 'react'
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import React, { useEffect } from "react";
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ThunkAction, ThunkDispatch } from "redux-thunk";
+import axios from "axios";
+import { configureStore, combineReducers } from "@reduxjs/toolkit";
 
+// Utils
+// console.log = () => {};
 
-// Types
-type LoginFieldsType = {
-    firstName?: string
-}
+// Api
+const instance = axios.create({
+    baseURL: "https://exams-frontend.kimitsu.it-incubator.ru/api/",
+});
 
-// Main
-export const Login = () => {
+const api = {
+    getUsers() {
+        return instance.get("users");
+    },
+};
 
-    const formik = useFormik({
-        initialValues: {
-            firstName: '',
-        },
-        validate: (values) => {
-            const errors: LoginFieldsType = {};
-            if (values.firstName.length < 5) errors.firstName = 'Must be 5 characters or more'
-            return errors
-        },
-        onSubmit: values => {
-            alert(JSON.stringify(values, null, 2));
-        }
+// Reducer
+const initState = {
+    isLoading: false,
+    users: [] as any[],
+};
+
+type InitStateType = typeof initState;
+
+const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
+    switch (action.type) {
+        case "APP/SET-USERS":
+            console.log(1)
+            /* 1 */
+            return { ...state, users: action.users };
+        case "APP/IS-LOADING":
+            console.log(2)
+            /* 2 */
+            return { ...state, isLoading: action.isLoading };
+        default:
+            return state;
+    }
+};
+
+// Actions
+const setUsersAC = (users: any[]) => ({ type: "APP/SET-USERS", users }) as const;
+const setLoadingAC = (isLoading: boolean) => ({ type: "APP/IS-LOADING", isLoading }) as const;
+type ActionsType = ReturnType<typeof setUsersAC> | ReturnType<typeof setLoadingAC>;
+
+// Thunk
+const getUsersTC = (): AppThunk => (dispatch) => {
+    console.log(3)
+    /* 3 */
+    dispatch(setLoadingAC(true));
+    api.getUsers().then((res) => {
+        console.log(res)
+        console.log(4)
+        /* 4 */
+        dispatch(setLoadingAC(false));
+        console.log(5)
+        /* 5 */
+        dispatch(setUsersAC(res.data.data));
     });
+};
+
+// Store
+const rootReducer = combineReducers({
+    app: appReducer,
+});
+
+const store = configureStore({ reducer: rootReducer });
+type RootState = ReturnType<typeof store.getState>;
+type AppDispatch = ThunkDispatch<RootState, unknown, ActionsType>;
+type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, ActionsType>;
+const useAppDispatch = () => useDispatch<AppDispatch>();
+const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+
+// Loader
+export const Loader = () => {
+    console.log(6)
+    /* 6 */
+    return <h1>Loading ...</h1>;
+};
+
+// Login
+export const Login = () => {
+    console.log(7)
+    /* 7 */
+
+    const users = useAppSelector((state) => state.app.users);
+    const isLoading = useAppSelector((state) => state.app.isLoading);
 
     return (
-        <form onSubmit={formik.handleSubmit}>
-            <div>
-                <input placeholder={'Введите имя'} {...formik.getFieldProps('firstName')} />
-            </div>
-            <button type="submit" disabled={!(formik.isValid && formik.dirty)}>Отправить</button>
-        </form>
+        <div>
+            {isLoading && <Loader />}
+            {users.map((u) => (
+                <p key={u.id}>{u.email}</p>
+            ))}
+            <h1>
+                В данном задании на экран смотреть не нужно. Рекомендуем взять ручку, листик и
+                последовательно, спокойно расставить цифры в нужном порядке. Прежде чем давать ответ
+                обязательно посчитайте к-во цифр и сверьте с подсказкой. Удачи 🚀
+            </h1>
+        </div>
     );
-}
+};
 
 // App
 export const App = () => {
+    console.log(8)
+    /* 8 */
+    const dispatch = useAppDispatch();
+
+    useEffect(() => {
+        console.log(9)
+        /* 9 */
+        dispatch(getUsersTC());
+    }, []);
+    console.log(10)
+    /* 10 */
     return (
         <Routes>
-            <Route path={''} element={<Login />} />
+            <Route path={""} element={<Login />} />
         </Routes>
-    )
-}
+    );
+};
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<BrowserRouter><App /></BrowserRouter>)
+const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+root.render(
+    <Provider store={store}>
+        <BrowserRouter>
+            <App />
+        </BrowserRouter>
+    </Provider>,
+);
 
 // 📜 Описание:
-// Начните вводить в поле firstName символы. После ввода первого символа кнопка "Отправить" раздизаблится.
-// Задача: кнопка "Отправить" должна раздизаблиться только в том случае, если длинна имени больше, либо равна 5 символам.
-// Т.е. вам необходимо самостоятельно написать эту валидацию для поля firstName.
-// ❗ В качестве текста ошибки напишите 'Must be 5 characters or more'
-// ❗ Текст ошибки выводить не нужно (только если для себя поиграться).
+// Задача: напишите в какой последовательности вызовутся числа при успешном запросе.
+// Подсказка: будет 13 чисел.
+// Ответ дайте через пробел.
 
-// В качестве ответа напишите полностью строку кода с условием.
-// 🖥 Пример ответа: return errors.firstName = 'Must be 5 characters or more'
-// ❗ Сторонние библиотеки (например yup) использовать запрещено
+// 🖥 Пример ответа: 1 2 3 4 5 6 7 8 9 10 1 2 3
